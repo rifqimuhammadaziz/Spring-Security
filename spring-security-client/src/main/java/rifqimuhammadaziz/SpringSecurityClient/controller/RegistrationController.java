@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
+import rifqimuhammadaziz.SpringSecurityClient.entity.PasswordModel;
 import rifqimuhammadaziz.SpringSecurityClient.entity.User;
 import rifqimuhammadaziz.SpringSecurityClient.entity.VerificationToken;
 import rifqimuhammadaziz.SpringSecurityClient.event.RegistrationCompleteEvent;
@@ -11,6 +12,8 @@ import rifqimuhammadaziz.SpringSecurityClient.model.UserModel;
 import rifqimuhammadaziz.SpringSecurityClient.service.UserService;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @Slf4j
@@ -47,6 +50,51 @@ public class RegistrationController {
         User user = verificationToken.getUser();
         resendVerificationTokenMail(user, applicationUrl(request), verificationToken);
         return "Verification link sent";
+    }
+
+    @PostMapping("/resetPassword")
+    public String resetPassword(@RequestBody PasswordModel passwordModel, HttpServletRequest request) {
+        User user = userService.findUserByEmail(passwordModel.getEmail());
+        String url = "";
+        if (user != null) {
+            String token = UUID.randomUUID().toString();
+            userService.createPasswordResetTokenForUser(user, token);
+            url = passwordResetTokenMail(user, applicationUrl(request), token);
+        }
+        return url;
+    }
+
+    @PostMapping("/savePassword")
+    public String savePassword(@RequestParam("token") String token, @RequestBody PasswordModel passwordModel) {
+        String result = userService.validatePasswordResetToken(token);
+        if (!result.equalsIgnoreCase("valid")) {
+            return "Invalid Token";
+        }
+        Optional<User> user = userService.findUserByPasswordResetToken(token);
+        if (user.isPresent()) {
+            userService.changePassword(user.get(), passwordModel.getNewPassword());
+            return "Successfully change password";
+        } else {
+            return "Invalid Token";
+        }
+    }
+
+    @PostMapping("/changePassword")
+    public String changePassword(@RequestBody PasswordModel passwordModel) {
+        User user = userService.findUserByEmail(passwordModel.getEmail());
+        if (!userService.checkIfValidOldPassword(user, passwordModel.getOldPassword())) {
+            return "Invalid Old Password";
+        }
+
+        // Save new password
+        userService.changePassword(user, passwordModel.getNewPassword());
+        return "Password changed successfully";
+    }
+
+    private String passwordResetTokenMail(User user, String applicationUrl, String token) {
+        String url = applicationUrl + "/savePassword?token=" + token;
+        log.info("Click the link to reset your password : {}", url);
+        return url;
     }
 
     private void resendVerificationTokenMail(User user, String applicationUrl, VerificationToken verificationToken) {
