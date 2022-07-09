@@ -59,6 +59,7 @@ public class AuthorizationServerConfig {
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 .build();
 
+
         return new InMemoryRegisteredClientRepository(registeredClient);
     }
 
@@ -94,7 +95,7 @@ public class AuthorizationServerConfig {
     @Bean
     public ProviderSettings providerSettings() {
         return ProviderSettings.builder()
-                .issuer("http://auth-server:9000/")
+                .issuer("http://auth-server:9000")
                 .build();
     }
 }
